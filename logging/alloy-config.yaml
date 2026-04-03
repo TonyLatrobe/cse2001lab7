@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-config
+  namespace: observability
+data:
+  config.alloy: |
+    // ── Log collection ───────────────────────────────────────────────────────
+
+    // Discover all container log files on the node
+    local.file_match "containers" {
+      path_targets = [{
+        __path__ = "/var/log/containers/*.log",
+      }]
+      sync_period = "10s"
+    }
+
+    // Read and tail the matched log files
+    loki.source.file "container_logs" {
+      targets    = local.file_match.containers.targets
+      forward_to = [loki.process.add_labels.receiver]
+    }
+
+    // Extract namespace / pod / container from the filename and attach as labels.
+    // Filename pattern: /var/log/containers/<pod>_<namespace>_<container>-<id>.log
+    loki.process "add_labels" {
+      stage.regex {
+        expression = "/var/log/containers/(?P<pod>[^_]+)_(?P<namespace>[^_]+)_(?P<container>[^-]+)"
+        source     = "filename"
+      }
+      stage.labels {
+        values = {
+          pod       = "pod",
+          namespace = "namespace",
+          container = "container",
+        }
+      }
+      forward_to = [loki.write.loki_endpoint.receiver]
+    }
+
+    // ── Push to Loki ─────────────────────────────────────────────────────────
+    loki.write "loki_endpoint" {
+      endpoint {
+        url = "http://loki:3100/loki/api/v1/push"
+      }
+    }

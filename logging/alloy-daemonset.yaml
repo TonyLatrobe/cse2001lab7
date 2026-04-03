@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: alloy
+  namespace: observability
+spec:
+  selector:
+    matchLabels:
+      app: alloy
+  template:
+    metadata:
+      labels:
+        app: alloy
+    spec:
+      tolerations:
+        # Ensure Alloy runs on control-plane nodes too (needed for MicroK8s single-node)
+        - key:    node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+      containers:
+        - name: alloy
+          image: localhost:32000/alloy:lab
+          imagePullPolicy: IfNotPresent
+          args:
+            - run
+            - /etc/alloy/config.alloy
+            - --storage.path=/var/lib/alloy/data
+          ports:
+            - name: http-metrics
+              containerPort: 12345
+          volumeMounts:
+            - name: alloy-config
+              mountPath: /etc/alloy
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: alloy-data
+              mountPath: /var/lib/alloy/data
+      volumes:
+        - name: alloy-config
+          configMap:
+            name: alloy-config
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: alloy-data
+          emptyDir: {}

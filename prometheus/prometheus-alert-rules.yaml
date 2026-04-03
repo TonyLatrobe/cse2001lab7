@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alert-rules
+  namespace: observability
+data:
+  alert-rules.yaml: |
+    groups:
+      - name: lab-infrastructure
+        rules:
+
+          # Any scrape target has gone down
+          - alert: TargetDown
+            expr: up == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Scrape target {{ $labels.job }} is down"
+              description: "Prometheus cannot reach {{ $labels.job }} at {{ $labels.instance }}"
+
+          # Jenkins disappeared entirely from scrape targets
+          - alert: JenkinsMissing
+            expr: absent(up{job="jenkins"})
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Jenkins is not present in scrape targets"
+              description: "No Jenkins instance is reachable — pipeline jobs cannot run"
+
+          # Loki disappeared — logs are being lost
+          - alert: LokiMissing
+            expr: absent(up{job="loki"})
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Loki is not reachable"
+              description: "Log ingestion may be failing — check Alloy pipeline"
+
+          # Alloy disappeared — logs are not being shipped
+          - alert: AlloyMissing
+            expr: absent(up{job="alloy"})
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Alloy log shipper is not reachable"
+              description: "Container logs may not be reaching Loki"
+
+          # Demo app disappeared
+          - alert: DemoAppDown
+            expr: absent(up{job="demo-app"})
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Demo app is not reachable"
+              description: "The demo-app nginx service has disappeared from scrape targets"
+
+          # Prometheus rule evaluation slow
+          - alert: PrometheusSlowRuleEvaluation
+            expr: prometheus_rule_evaluation_duration_seconds{quantile="0.9"} > 5
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Prometheus rule evaluation is slow"
+              description: "90th percentile rule evaluation is over 5s — check rule complexity"

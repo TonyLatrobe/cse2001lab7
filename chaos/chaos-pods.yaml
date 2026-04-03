@@ -1,0 +1,57 @@
+# Apply this file to intentionally trigger alerts.
+# kubectl apply -f k8s/chaos/chaos-pods.yaml -n observability
+# kubectl delete -f k8s/chaos/chaos-pods.yaml -n observability   <-- cleanup
+
+# ── Triggers: TargetDown / container restart alert ───────────────────────────
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crashloop-test
+  namespace: observability
+spec:
+  containers:
+    - name: crash
+      image: localhost:32000/busybox:lab
+      imagePullPolicy: IfNotPresent
+      command: ["sh", "-c", "exit 1"]
+
+---
+# ── Triggers: image pull failure / replica mismatch ──────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-deployment
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broken-app
+  template:
+    metadata:
+      labels:
+        app: broken-app
+    spec:
+      containers:
+        - name: broken-app
+          image: localhost:32000/nginx:doesnotexist   # intentionally bad tag
+          imagePullPolicy: Always
+
+---
+# ── Triggers: high CPU visible in Grafana node metrics ───────────────────────
+# Uses busybox + yes pipe — same effect as stress, no extra image needed.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cpu-stress
+  namespace: observability
+spec:
+  containers:
+    - name: stress
+      image: localhost:32000/busybox:lab
+      imagePullPolicy: IfNotPresent
+      command: ["sh", "-c", "yes > /dev/null &  yes > /dev/null & wait"]
+      resources:
+        limits:
+          cpu: "1"
+          memory: "64Mi"

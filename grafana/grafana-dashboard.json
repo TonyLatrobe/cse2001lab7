@@ -1,0 +1,61 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "DevSecOps Observability Lab",
+    "timezone": "browser",
+    "panels": [
+      {
+        "type": "graph",
+        "title": "Node CPU Usage",
+        "targets": [
+          {
+            "expr": "100 - avg(rate(node_cpu_seconds_total{mode='idle'}[5m])) * 100",
+            "legendFormat": "{{instance}}"
+          }
+        ]
+      },
+      {
+        "type": "graph",
+        "title": "Node Memory Usage",
+        "targets": [
+          {
+            "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+            "legendFormat": "{{instance}}"
+          }
+        ]
+      },
+      {
+        "type": "graph",
+        "title": "Prometheus Scrape Targets Up",
+        "targets": [
+          {
+            "expr": "up",
+            "legendFormat": "{{job}} - {{instance}}"
+          }
+        ]
+      },
+      {
+        "type": "graph",
+        "title": "Loki Ingestion Rate",
+        "targets": [
+          {
+            "expr": "rate(loki_distributor_lines_received_total[5m])",
+            "legendFormat": "{{instance}}"
+          }
+        ]
+      },
+      {
+        "type": "graph",
+        "title": "Alloy Log Pipeline Health",
+        "targets": [
+          {
+            "expr": "alloy_component_controller_running_components",
+            "legendFormat": "{{health}}"
+          }
+        ]
+      }
+    ],
+    "schemaVersion": 30,
+    "version": 1
+  }
+}
