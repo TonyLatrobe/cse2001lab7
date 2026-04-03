@@ -5,9 +5,8 @@ metadata:
   namespace: observability
 data:
   config.alloy: |
-    // ── Log collection ───────────────────────────────────────────────────────
-
-    // Discover all container log files on the node
+    // ── LOG COLLECTION (Loki) ────────────────────────────────────────────────
+    // Tails the actual log files on the node disk
     local.file_match "containers" {
       path_targets = [{
         __path__ = "/var/log/containers/*.log",
@@ -15,14 +14,11 @@ data:
       sync_period = "10s"
     }
 
-    // Read and tail the matched log files
     loki.source.file "container_logs" {
       targets    = local.file_match.containers.targets
       forward_to = [loki.process.add_labels.receiver]
     }
 
-    // Extract namespace / pod / container from the filename and attach as labels.
-    // Filename pattern: /var/log/containers/<pod>_<namespace>_<container>-<id>.log
     loki.process "add_labels" {
       stage.regex {
         expression = "/var/log/containers/(?P<pod>[^_]+)_(?P<namespace>[^_]+)_(?P<container>[^-]+)"
@@ -38,9 +34,43 @@ data:
       forward_to = [loki.write.loki_endpoint.receiver]
     }
 
-    // ── Push to Loki ─────────────────────────────────────────────────────────
     loki.write "loki_endpoint" {
       endpoint {
         url = "http://loki:3100/loki/api/v1/push"
+      }
+    }
+
+    // ── METRICS COLLECTION (Prometheus via cAdvisor) ─────────────────────────
+    // This talks to the Kubelet to get CPU/RAM without needing extra exporters
+    
+    discovery.kubernetes "nodes" {
+      role = "node"
+    }
+
+    prometheus.scrape "cadvisor" {
+      targets = discovery.kubernetes.nodes.targets
+      
+      metrics_path = "/metrics/cadvisor"
+      scheme       = "https"
+
+      authorization {
+        type             = "Bearer"
+        credentials_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      }
+
+      tls_config {
+        ca_file              = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+        insecure_skip_verify = true
+      }
+
+      forward_to = [prometheus.remote_write.prom_endpoint.receiver]
+    }
+
+    // ── SINGLE PUSH ENDPOINT ─────────────────────────────────────────────────
+    // Consolidated to avoid the "Duplicate Component" error
+
+    prometheus.remote_write "prom_endpoint" {
+      endpoint {
+        url = "http://prometheus:9090/api/v1/write"
       }
     }

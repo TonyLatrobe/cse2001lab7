@@ -8,6 +8,11 @@ spec:
   selector:
     app: demo-app
   ports:
-    - port: 80
+    - name: http
+      port: 80
       targetPort: 80
-      nodePort: 30080   # optional (must be within 30000–32767)
+      nodePort: 30080
+
+    - name: metrics
+      port: 9113
+      targetPort: 9113

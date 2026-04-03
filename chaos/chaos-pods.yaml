@@ -1,57 +1,30 @@
-# Apply this file to intentionally trigger alerts.
-# kubectl apply -f k8s/chaos/chaos-pods.yaml -n observability
-# kubectl delete -f k8s/chaos/chaos-pods.yaml -n observability   <-- cleanup
-
-# ── Triggers: TargetDown / container restart alert ───────────────────────────
 apiVersion: v1
 kind: Pod
 metadata:
-  name: crashloop-test
+  name: demo-app-load-gen
   namespace: observability
+  labels:
+    app: demo-app
+    job: demo-app
 spec:
   containers:
-    - name: crash
+    - name: load-gen
       image: localhost:32000/busybox:lab
-      imagePullPolicy: IfNotPresent
-      command: ["sh", "-c", "exit 1"]
+      # This loop now runs forever without exiting
+      command: ["sh", "-c", "while true; do wget -q -O- http://demo-app:80/ > /dev/null; wget -q -O- http://demo-app:80/this-path-does-not-exist > /dev/null; sleep 0.1; done"]
 
 ---
-# ── Triggers: image pull failure / replica mismatch ──────────────────────────
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: broken-deployment
-  namespace: observability
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: broken-app
-  template:
-    metadata:
-      labels:
-        app: broken-app
-    spec:
-      containers:
-        - name: broken-app
-          image: localhost:32000/nginx:doesnotexist   # intentionally bad tag
-          imagePullPolicy: Always
-
----
-# ── Triggers: high CPU visible in Grafana node metrics ───────────────────────
-# Uses busybox + yes pipe — same effect as stress, no extra image needed.
 apiVersion: v1
 kind: Pod
 metadata:
-  name: cpu-stress
+  name: jenkins-chaos-impersonator
   namespace: observability
+  labels:
+    app: jenkins
+    job: jenkins
 spec:
   containers:
-    - name: stress
+    - name: cpu-burner
       image: localhost:32000/busybox:lab
-      imagePullPolicy: IfNotPresent
-      command: ["sh", "-c", "yes > /dev/null &  yes > /dev/null & wait"]
-      resources:
-        limits:
-          cpu: "1"
-          memory: "64Mi"
+      # Removed 'exit 1'. This will keep the CPU 'mountain' flat at the top
+      command: ["sh", "-c", "echo 'Jenkins Constant Stress Start'; yes > /dev/null & yes > /dev/null & yes > /dev/null & while true; do sleep 30; done"]

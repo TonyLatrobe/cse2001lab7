@@ -19,6 +19,8 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - "--config.file=/etc/prometheus/prometheus.yml"
+            # ADDED THE LINE BELOW TO ENABLE THE RECEIVER
+            - "--web.enable-remote-write-receiver"
           ports:
             - containerPort: 9090
           volumeMounts:
